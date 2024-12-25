@@ -1,55 +1,173 @@
-import { useEffect } from "react";
-import { useMap } from "react-leaflet";
 import L from "leaflet";
+import * as turf from "@turf/turf";
+import nearestPointOnLine from "@turf/nearest-point-on-line";
+import { useEffect, useState } from "react";
 
-const JeepneyRouter = ({
-  start,
-  end,
-}: {
-  start: [number, number];
-  end: [number, number];
-}) => {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!map) return;
-
-    const routingControl = L.Routing.control({
-      waypoints: [L.latLng(start[0], start[1]), L.latLng(end[0], end[1])],
-      routeWhileDragging: false,
-      showAlternatives: false,
-      lineOptions: {
-        styles: [{ color: "black", dashArray: "5,5", weight: 4 }],
-        extendToWaypoints: true,
-        missingRouteTolerance: 100,
-      },
-    }).addTo(map);
-
-    routingControl.getWaypoints().forEach((waypoint, index) => {
-      const latLng = waypoint.latLng;
-      if (latLng) {
-        const marker = L.marker(latLng, {
-          draggable: index === 0,
-        }).addTo(map);
-
-        if (index === 0) {
-          marker.bindPopup("Start Point").openPopup();
-        } else if (index === 1) {
-          marker.bindPopup("End Point").openPopup();
-        }
-      }
-    });
-
-    return () => {
-      map.removeControl(routingControl);
-    };
-  }, [map, start, end]);
-
-  return null;
+type JeepneyRoute = {
+  name: string;
+  color: string;
+  coordinates: [number, number][];
 };
 
-export default JeepneyRouter;
+class FlexibleJeepneyRouter {
+  routes: JeepneyRoute[];
 
+  constructor(routes: JeepneyRoute[]) {
+    this.routes = routes; // Predefined jeepney routes
+  }
+
+  route(
+    waypoints: { latLng: L.LatLng }[],
+    callback: (error: Error | null, routes: any[] | null) => void,
+    context: any
+  ) {
+    const start = waypoints[0].latLng;
+    const end = waypoints[1].latLng;
+
+    const startRoutes = this.findRoutesNearPoint(start);
+    const endRoutes = this.findRoutesNearPoint(end);
+
+    const directRoute = this.findDirectRoute(
+      startRoutes,
+      endRoutes,
+      start,
+      end
+    );
+    if (directRoute) {
+      return callback(null, [this.formatRoute(directRoute)]);
+    }
+
+    const transferRoute = this.findTransferRoute(
+      startRoutes,
+      endRoutes,
+      start,
+      end
+    );
+    if (transferRoute) {
+      return callback(null, [this.formatRoute(transferRoute)]);
+    }
+
+    callback(new Error("No jeepney route found"), null);
+  }
+
+  findRoutesNearPoint(point: L.LatLng, threshold = 0.005) {
+    return this.routes.filter((route) => {
+      const line = turf.lineString(route.coordinates);
+      const nearestPoint = nearestPointOnLine(
+        line,
+        turf.point([point.lng, point.lat])
+      );
+      return nearestPoint.properties.dist <= threshold;
+    });
+  }
+
+  findDirectRoute(
+    startRoutes: any,
+    endRoutes: any,
+    start: L.LatLng,
+    end: L.LatLng
+  ) {
+    for (let route of startRoutes) {
+      if (endRoutes.includes(route)) {
+        const line = turf.lineString(route.path);
+        const startNearest = nearestPointOnLine(
+          line,
+          turf.point([start.lng, start.lat])
+        );
+        const endNearest = nearestPointOnLine(
+          line,
+          turf.point([end.lng, end.lat])
+        );
+
+        if (startNearest.properties.index < endNearest.properties.index) {
+          return { route, startNearest, endNearest };
+        }
+      }
+    }
+    return null;
+  }
+
+  findTransferRoute(
+    startRoutes: any,
+    endRoutes: any,
+    start: L.LatLng,
+    end: L.LatLng
+  ) {
+    for (let startRoute of startRoutes) {
+      for (let endRoute of endRoutes) {
+        const transferStops = this.findOverlapPoints(startRoute, endRoute);
+        if (transferStops.length > 0) {
+          return { startRoute, endRoute, transferStop: transferStops[0] };
+        }
+      }
+    }
+    return null;
+  }
+
+  findOverlapPoints(routeA: any, routeB: any) {
+    return routeA.path.filter((coordA: [number, number]) =>
+      routeB.path.some((coordB: [number, number]) => {
+        return (
+          Math.abs(coordA[0] - coordB[0]) < 0.0005 &&
+          Math.abs(coordA[1] - coordB[1]) < 0.0005
+        );
+      })
+    );
+  }
+
+  formatRoute(route: any) {
+    if (route.startRoute && route.endRoute) {
+      return {
+        name: `${route.startRoute.name} to ${route.endRoute.name} (via transfer)`,
+        coordinates: [...route.startRoute.path, ...route.endRoute.path],
+        instructions: [
+          { text: `Take ${route.startRoute.name} to transfer point` },
+          {
+            text: `Transfer to ${route.endRoute.name} and proceed to destination`,
+          },
+        ],
+      };
+    } else {
+      return {
+        name: route.route.name,
+        coordinates: route.route.path,
+        instructions: [{ text: `Take ${route.route.name}` }],
+      };
+    }
+  }
+}
+
+const JeepneyRouter = ({ start, end }: { start: [number, number]; end: [number, number] }) => {
+  const [jeepneyRoutes, setJeepneyRoutes] = useState<JeepneyRoute[]>([]);
+
+useEffect(() => {
+  fetch("/data/Routes.json")
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((data) => setJeepneyRoutes(data.jeepneyRoutes))
+    .catch((error) => console.error("Error fetching JSON:", error));
+}, []);
+
+const map = L.map("map").setView([14.599512, 120.984222], 13);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "© OpenStreetMap contributors",
+}).addTo(map);
+
+L.Routing.control({
+  waypoints: [
+    L.latLng(start[0], start[1]), 
+    L.latLng(end[0], end[1]),
+  ],
+  router: new FlexibleJeepneyRouter(jeepneyRoutes),
+  routeWhileDragging: true,
+}).addTo(map);
+
+export default JeepneyRouter;
 
 /*
 const calculateNearestPointOnRoute = (
@@ -106,27 +224,12 @@ const calculateNearestPointOnRoute = (
     jeepneyRoutes[0]?.coordinates
   );
 
-    type JeepneyRoute = {
-  name: string;
-  color: string;
-  coordinates: [number, number][];
+    
 };
 
 
 
     ROUTE FETCHER
-     const [jeepneyRoutes, setJeepneyRoutes] = useState<JeepneyRoute[]>([]);
-    
-      useEffect(() => {
-        fetch("/data/Routes.json")
-          .then((response) => {
-            if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-          })
-          .then((data) => setJeepneyRoutes(data.jeepneyRoutes))
-          .catch((error) => console.error("Error fetching JSON:", error));
-      }, []);
+     
 
   */
