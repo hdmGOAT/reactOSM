@@ -106,6 +106,11 @@ const calculateNearestPointOnRoute = (
     jeepneyRoutes[0]?.coordinates
   );
 
+    type JeepneyRoute = {
+  name: string;
+  color: string;
+  coordinates: [number, number][];
+};
 
 
 
