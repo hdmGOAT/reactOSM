@@ -105,4 +105,23 @@ const calculateNearestPointOnRoute = (
     start,
     jeepneyRoutes[0]?.coordinates
   );
+
+
+
+
+    ROUTE FETCHER
+     const [jeepneyRoutes, setJeepneyRoutes] = useState<JeepneyRoute[]>([]);
+    
+      useEffect(() => {
+        fetch("/data/Routes.json")
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+          })
+          .then((data) => setJeepneyRoutes(data.jeepneyRoutes))
+          .catch((error) => console.error("Error fetching JSON:", error));
+      }, []);
+
   */
