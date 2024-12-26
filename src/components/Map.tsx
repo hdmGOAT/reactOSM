@@ -40,4 +40,5 @@ const Map = () => {
   );
 };
 
-export default Map;
+export default Map; // problem area
+Added this right now bruh
