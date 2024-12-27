@@ -1,9 +1,10 @@
 import L from "leaflet";
 import * as turf from "@turf/turf";
 import nearestPointOnLine from "@turf/nearest-point-on-line";
-import { useEffect, useState } from "react";
+import { useMap } from "react-leaflet";
+import { useEffect } from "react";
 
-type JeepneyRoute = {
+export type JeepneyRoute = {
   name: string;
   color: string;
   coordinates: [number, number][];
@@ -13,51 +14,78 @@ class FlexibleJeepneyRouter {
   routes: JeepneyRoute[];
 
   constructor(routes: JeepneyRoute[]) {
-    this.routes = routes; // Predefined jeepney routes
+    this.routes = routes;
   }
 
   route(
-    waypoints: { latLng: L.LatLng }[],
-    callback: (error: Error | null, routes: any[] | null) => void,
-    context: any
+    waypoints: L.Routing.Waypoint[],
+    callback: (
+      error?: L.Routing.IError | undefined,
+      routes?: L.Routing.IRoute[] | undefined
+    ) => void
   ) {
-    const start = waypoints[0].latLng;
-    const end = waypoints[1].latLng;
+    try {
+      console.log("Waypoints passed to router:", waypoints);
 
-    const startRoutes = this.findRoutesNearPoint(start);
-    const endRoutes = this.findRoutesNearPoint(end);
+      const start = waypoints[0].latLng;
+      const end = waypoints[1].latLng;
 
-    const directRoute = this.findDirectRoute(
-      startRoutes,
-      endRoutes,
-      start,
-      end
-    );
-    if (directRoute) {
-      return callback(null, [this.formatRoute(directRoute)]);
+      console.log("Start:", start, "End:", end);
+
+      const startRoutes = this.findRoutesNearPoint(start);
+      const endRoutes = this.findRoutesNearPoint(end);
+
+      console.log("Start routes:", startRoutes);
+      console.log("End routes:", endRoutes);
+
+      const directRoute = this.findDirectRoute(
+        startRoutes,
+        endRoutes,
+        start,
+        end
+      );
+      if (directRoute) {
+        console.log("Direct route found:", directRoute);
+        callback(undefined, [this.formatRoute(directRoute)]);
+        return;
+      }
+
+      const transferRoute = this.findTransferRoute(startRoutes, endRoutes);
+      if (transferRoute) {
+        console.log("Transfer route found:", transferRoute);
+        callback(undefined, [this.formatRoute(transferRoute)]);
+        return;
+      }
+
+      callback({ status: 404, message: "No route found" }, undefined);
+    } catch (error) {
+      console.error("Error in FlexibleJeepneyRouter.route:", error);
+      callback(
+        { status: 500, message: "Internal error in routing" },
+        undefined
+      );
     }
-
-    const transferRoute = this.findTransferRoute(
-      startRoutes,
-      endRoutes,
-      start,
-      end
-    );
-    if (transferRoute) {
-      return callback(null, [this.formatRoute(transferRoute)]);
-    }
-
-    callback(new Error("No jeepney route found"), null);
   }
 
-  findRoutesNearPoint(point: L.LatLng, threshold = 0.005) {
+  findRoutesNearPoint(point: L.LatLng, threshold = 8000) {
+    console.log("Checking point:", point);
+
     return this.routes.filter((route) => {
+      console.log("Route being checked:", route);
+
       const line = turf.lineString(route.coordinates);
       const nearestPoint = nearestPointOnLine(
         line,
         turf.point([point.lng, point.lat])
       );
-      return nearestPoint.properties.dist <= threshold;
+
+      if (nearestPoint.properties && nearestPoint.properties.dist) {
+        console.log("Distance to nearest point:", nearestPoint.properties.dist);
+        return nearestPoint.properties.dist <= threshold;
+      } else {
+        console.warn("Nearest point has no distance property");
+        return false;
+      }
     });
   }
 
@@ -69,7 +97,7 @@ class FlexibleJeepneyRouter {
   ) {
     for (let route of startRoutes) {
       if (endRoutes.includes(route)) {
-        const line = turf.lineString(route.path);
+        const line = turf.lineString(route.coordinates);
         const startNearest = nearestPointOnLine(
           line,
           turf.point([start.lng, start.lat])
@@ -87,12 +115,7 @@ class FlexibleJeepneyRouter {
     return null;
   }
 
-  findTransferRoute(
-    startRoutes: any,
-    endRoutes: any,
-    start: L.LatLng,
-    end: L.LatLng
-  ) {
+  findTransferRoute(startRoutes: any, endRoutes: any) {
     for (let startRoute of startRoutes) {
       for (let endRoute of endRoutes) {
         const transferStops = this.findOverlapPoints(startRoute, endRoute);
@@ -105,8 +128,8 @@ class FlexibleJeepneyRouter {
   }
 
   findOverlapPoints(routeA: any, routeB: any) {
-    return routeA.path.filter((coordA: [number, number]) =>
-      routeB.path.some((coordB: [number, number]) => {
+    return routeA.coordinates.filter((coordA: [number, number]) =>
+      routeB.coordinates.some((coordB: [number, number]) => {
         return (
           Math.abs(coordA[0] - coordB[0]) < 0.0005 &&
           Math.abs(coordA[1] - coordB[1]) < 0.0005
@@ -115,121 +138,74 @@ class FlexibleJeepneyRouter {
     );
   }
 
-  formatRoute(route: any) {
-    if (route.startRoute && route.endRoute) {
-      return {
-        name: `${route.startRoute.name} to ${route.endRoute.name} (via transfer)`,
-        coordinates: [...route.startRoute.path, ...route.endRoute.path],
-        instructions: [
-          { text: `Take ${route.startRoute.name} to transfer point` },
-          {
-            text: `Transfer to ${route.endRoute.name} and proceed to destination`,
-          },
-        ],
-      };
-    } else {
-      return {
-        name: route.route.name,
-        coordinates: route.route.path,
-        instructions: [{ text: `Take ${route.route.name}` }],
-      };
-    }
+  formatRoute(route: any): L.Routing.IRoute {
+    console.log("Formatting route:", route);
+
+    // Handle combined route with transfer
+    const coordinates = [
+      ...route.startRoute.coordinates,
+      route.transferStop,
+      ...route.endRoute.coordinates,
+    ].map(([lat, lng]: [number, number]) => L.latLng(lat, lng)); // Ensure Leaflet LatLng format
+
+    return {
+      name: `${route.startRoute.name} to ${route.endRoute.name}`, // Dynamic route name
+      coordinates,
+      summary: {
+        totalDistance: coordinates.length, // Replace with actual distance if needed
+        totalTime: 0, // Replace with actual time if available
+      },
+      instructions: [
+        {
+          text: `Take ${route.startRoute.name}`,
+          distance: 0, // Replace with actual distance
+          time: 0, // Replace with actual time
+        },
+        {
+          text: `Transfer at ${route.transferStop}`,
+          distance: 0,
+          time: 0,
+        },
+        {
+          text: `Take ${route.endRoute.name}`,
+          distance: 0,
+          time: 0,
+        },
+      ],
+    };
   }
 }
 
-const JeepneyRouter = ({ start, end }: { start: [number, number]; end: [number, number] }) => {
-  const [jeepneyRoutes, setJeepneyRoutes] = useState<JeepneyRoute[]>([]);
+const JeepneyRouter = ({
+  start,
+  end,
+  routes,
+}: {
+  start: [number, number];
+  end: [number, number];
+  routes: JeepneyRoute[];
+}) => {
+  const map = useMap();
+  console.log("Map instance:", map);
 
-useEffect(() => {
-  fetch("/data/Routes.json")
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
-    })
-    .then((data) => setJeepneyRoutes(data.jeepneyRoutes))
-    .catch((error) => console.error("Error fetching JSON:", error));
-}, []);
-
-const map = L.map("map").setView([14.599512, 120.984222], 13);
-
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: "© OpenStreetMap contributors",
-}).addTo(map);
-
-L.Routing.control({
-  waypoints: [
-    L.latLng(start[0], start[1]), 
-    L.latLng(end[0], end[1]),
-  ],
-  router: new FlexibleJeepneyRouter(jeepneyRoutes),
-  routeWhileDragging: true,
-}).addTo(map);
-
-export default JeepneyRouter;
-
-/*
-const calculateNearestPointOnRoute = (
-    startPoint: [number, number],
-    route: [number, number][]
-  ): [number, number] => {
-    let minDistance = Infinity;
-    let nearestPoint: [number, number] | null = null;
-
-    for (let i = 0; i < route?.length - 1; i++) {
-      const pointA = route[i];
-      const pointB = route[i + 1];
-
-      const closestPoint = calculateClosestPointOnSegment(
-        startPoint,
-        pointA,
-        pointB
-      );
-
-      const distance = Math.sqrt(
-        Math.pow(closestPoint[0] - startPoint[0], 2) +
-          Math.pow(closestPoint[1] - startPoint[1], 2)
-      );
-
-      if (distance < minDistance) {
-        minDistance = distance;
-        nearestPoint = closestPoint;
-      }
+  useEffect(() => {
+    if (!routes || routes.length === 0) {
+      console.warn("No routes to display.");
+      return;
     }
 
-    return nearestPoint!;
-  };
-  const calculateClosestPointOnSegment = (
-    point: [number, number],
-    segmentStart: [number, number],
-    segmentEnd: [number, number]
-  ): [number, number] => {
-    const [x1, y1] = segmentStart;
-    const [x2, y2] = segmentEnd;
-    const [px, py] = point;
+    const routingControl = L.Routing.control({
+      waypoints: [L.latLng(start[0], start[1]), L.latLng(end[0], end[1])],
+      routeWhileDragging: true,
+      router: new FlexibleJeepneyRouter(routes),
+    }).addTo(map);
 
-    const dx = x2 - x1;
-    const dy = y2 - y1;
+    return () => {
+      map.removeControl(routingControl);
+    };
+  }, [map, start, end, routes]);
 
-    const t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy);
-
-    const clampedT = Math.max(0, Math.min(1, t));
-
-    return [x1 + clampedT * dx, y1 + clampedT * dy];
-  };
-
-  const nearestPoint = calculateNearestPointOnRoute(
-    start,
-    jeepneyRoutes[0]?.coordinates
-  );
-
-    
+  return null;
 };
+export default JeepneyRouter;
 
-
-
-    ROUTE FETCHER
-     
-
-  */
