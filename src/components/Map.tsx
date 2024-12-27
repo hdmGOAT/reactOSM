@@ -1,4 +1,4 @@
-import { MapContainer, TileLayer, LayersControl } from "react-leaflet";
+import { MapContainer, TileLayer, LayersControl, Marker } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-routing-machine";
 import "leaflet-routing-machine/dist/leaflet-routing-machine.css";
@@ -76,9 +76,15 @@ const Map = () => {
           />
         </LayersControl.BaseLayer>
 
+        <LayersControl.Overlay name="Start and Stop" checked>
+          <Marker position={start} />
+          <Marker position={end} />
+        </LayersControl.Overlay>
+        {/*
         <LayersControl.Overlay name="Jeepney Route">
           <JeepneyRouter start={start} end={end} routes={jeepneyRoutes} />
         </LayersControl.Overlay>
+        */}
       </LayersControl>
     </MapContainer>
   );

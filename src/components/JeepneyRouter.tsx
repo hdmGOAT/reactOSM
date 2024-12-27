@@ -51,6 +51,8 @@ class FlexibleJeepneyRouter {
       }
 
       const transferRoute = this.findTransferRoute(startRoutes, endRoutes);
+      console.log("Transfer route before formatting:", transferRoute);
+
       if (transferRoute) {
         console.log("Transfer route found:", transferRoute);
         callback(undefined, [this.formatRoute(transferRoute)]);
@@ -141,28 +143,28 @@ class FlexibleJeepneyRouter {
   formatRoute(route: any): L.Routing.IRoute {
     console.log("Formatting route:", route);
 
-    // Handle combined route with transfer
+    // Combine startRoute, transferStop, and endRoute into a single coordinates array
     const coordinates = [
       ...route.startRoute.coordinates,
-      route.transferStop,
+      ...[route.transferStop], // Ensure transferStop is added as an array
       ...route.endRoute.coordinates,
-    ].map(([lat, lng]: [number, number]) => L.latLng(lat, lng)); // Ensure Leaflet LatLng format
+    ].map(([lat, lng]: [number, number]) => L.latLng(lat, lng)); // Convert to Leaflet LatLng
 
     return {
-      name: `${route.startRoute.name} to ${route.endRoute.name}`, // Dynamic route name
+      name: `${route.startRoute.name} to ${route.endRoute.name}`, // Generate a dynamic name
       coordinates,
       summary: {
-        totalDistance: coordinates.length, // Replace with actual distance if needed
-        totalTime: 0, // Replace with actual time if available
+        totalDistance: coordinates.length * 100, // Dummy distance (replace with actual)
+        totalTime: coordinates.length * 10, // Dummy time (replace with actual)
       },
       instructions: [
         {
           text: `Take ${route.startRoute.name}`,
-          distance: 0, // Replace with actual distance
-          time: 0, // Replace with actual time
+          distance: 0, // Replace with actual distance if available
+          time: 0, // Replace with actual time if available
         },
         {
-          text: `Transfer at ${route.transferStop}`,
+          text: `Transfer at (${route.transferStop[0]}, ${route.transferStop[1]})`,
           distance: 0,
           time: 0,
         },
@@ -186,26 +188,37 @@ const JeepneyRouter = ({
   routes: JeepneyRoute[];
 }) => {
   const map = useMap();
-  console.log("Map instance:", map);
 
   useEffect(() => {
-    if (!routes || routes.length === 0) {
-      console.warn("No routes to display.");
+    if (!map || !routes || routes.length === 0) {
+      console.warn("Map or routes not initialized properly.");
       return;
     }
 
     const routingControl = L.Routing.control({
       waypoints: [L.latLng(start[0], start[1]), L.latLng(end[0], end[1])],
-      routeWhileDragging: true,
       router: new FlexibleJeepneyRouter(routes),
-    }).addTo(map);
+      routeWhileDragging: true,
+    });
+
+    console.log("Routing control initialized:", routingControl);
+
+    try {
+      routingControl.addTo(map);
+    } catch (error) {
+      console.error("Error adding routing control to map:", error);
+    }
 
     return () => {
-      map.removeControl(routingControl);
+      if (map) {
+        map.removeControl(routingControl);
+      }
     };
   }, [map, start, end, routes]);
 
   return null;
 };
+
 export default JeepneyRouter;
+
 
