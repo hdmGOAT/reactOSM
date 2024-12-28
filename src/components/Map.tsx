@@ -80,11 +80,10 @@ const Map = () => {
           <Marker position={start} />
           <Marker position={end} />
         </LayersControl.Overlay>
-        {/*
+
         <LayersControl.Overlay name="Jeepney Route">
           <JeepneyRouter start={start} end={end} routes={jeepneyRoutes} />
         </LayersControl.Overlay>
-        */}
       </LayersControl>
     </MapContainer>
   );

@@ -178,6 +178,9 @@ class FlexibleJeepneyRouter {
   }
 }
 
+
+
+
 const JeepneyRouter = ({
   start,
   end,
@@ -197,7 +200,7 @@ const JeepneyRouter = ({
 
     const routingControl = L.Routing.control({
       waypoints: [L.latLng(start[0], start[1]), L.latLng(end[0], end[1])],
-      router: new FlexibleJeepneyRouter(routes),
+      //router: new FlexibleJeepneyRouter(routes),
       routeWhileDragging: true,
     });
 
