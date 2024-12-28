@@ -3,6 +3,8 @@ import * as turf from "@turf/turf";
 import nearestPointOnLine from "@turf/nearest-point-on-line";
 import { useMap } from "react-leaflet";
 import { useEffect } from "react";
+import length from "@turf/length";
+import { lineString } from "@turf/helpers";
 
 export type JeepneyRoute = {
   name: string;
@@ -48,7 +50,34 @@ class FlexibleJeepneyRouter {
         const formattedRoute = this.formatDirectRoute(directRoute);
 
         console.log("Direct route found:", directRoute);
-        callback(undefined, [formattedRoute]);
+        console.log("Formatted direct route:", formattedRoute);
+        try {
+          console.log("Invoking callback with formatted route...");
+          try {
+            console.log("Invoking callback with test route...");
+            if (
+              !this.testRoute.coordinates ||
+              this.testRoute.coordinates.length === 0
+            ) {
+              throw new Error("Test route has invalid or missing coordinates.");
+            }
+
+            callback(undefined, [this.testRoute]);
+            console.log("Callback invoked successfully with test route.");
+          } catch (callbackError) {
+            console.error(
+              "Error invoking callback with test route:",
+              callbackError
+            );
+            throw callbackError;
+          }
+
+          console.log("Callback invoked successfully.");
+        } catch (callbackError) {
+          console.error("Error invoking callback:", callbackError);
+          throw callbackError;
+        }
+
         return;
       }
 
@@ -92,80 +121,100 @@ class FlexibleJeepneyRouter {
     end: L.LatLng
   ) {
     for (let route of startRoutes) {
+      console.log("route:", route);
       if (endRoutes.includes(route)) {
         const line = turf.lineString(route.coordinates);
         const startNearest = nearestPointOnLine(
           line,
-          turf.point([start.lng, start.lat])
+          turf.point([start.lat, start.lng])
         );
         const endNearest = nearestPointOnLine(
           line,
-          turf.point([end.lng, end.lat])
+          turf.point([end.lat, end.lng])
         );
 
-        if (startNearest.properties.index < endNearest.properties.index) {
-          return { route, startNearest, endNearest };
-        }
+        console.log("startNearest: ", startNearest, "endNearest: ", endNearest);
+
+        console.log(
+          "aaaaaaa",
+          startNearest.properties.index,
+          "bbbbb",
+          endNearest.properties.index
+        );
+
+        return { route, startNearest, endNearest };
       }
     }
     return null;
   }
-   
 
   formatDirectRoute(route: any): L.Routing.IRoute {
     console.log("Formatting direct route:", route);
 
+    // Validate and map coordinates
     const coordinates = route.route.coordinates.map(
-      ([lat, lng]: [number, number]) => L.latLng(lat, lng)
+      ([lat, lng]: [number, number]) => {
+        if (typeof lat !== "number" || typeof lng !== "number") {
+          throw new Error("Invalid coordinate format in route.coordinates");
+        }
+        return L.latLng(lat, lng);
+      }
     );
 
+    if (coordinates.length === 0) {
+      throw new Error("Route has no valid coordinates.");
+    }
+
+    // Create a LineString and calculate total distance and time
+    const line = lineString(route.route.coordinates);
+    const totalDistance = length(line, { units: "kilometers" }) * 1000; // Convert to meters
+    const totalTime = (totalDistance / 50) * 60; // Assume 50 km/h average speed
+
+    // Generate detailed instructions
+    const instructions = coordinates.map((_: any, index: number) => ({
+      text: `Continue to point ${index + 1}`,
+      distance: totalDistance / coordinates.length,
+      time: totalTime / coordinates.length,
+    }));
+
+    // Return the formatted route
     return {
       name: route.route.name || "Direct Route",
       coordinates,
       summary: {
-        totalDistance: coordinates.length * 100, // Dummy distance
-        totalTime: coordinates.length * 10, // Dummy time
+        totalDistance,
+        totalTime,
       },
-      instructions: [
-        {
-          text: `Follow the ${route.route.name}`,
-          distance: 0, // Replace with actual distance
-          time: 0, // Replace with actual time
-        },
-      ],
+      instructions,
     };
   }
 
-  formatRoute(route: any): L.Routing.IRoute {
-    console.log("Formatting route:", route);
-
-    const coordinates = [
-      ...route.startRoute.coordinates,
-
-      ...route.endRoute.coordinates,
-    ].map(([lat, lng]: [number, number]) => L.latLng(lat, lng)); // Convert to Leaflet LatLng
-
-    return {
-      name: `${route.startRoute.name} to ${route.endRoute.name}`,
-      summary: {
-        totalDistance: coordinates.length * 100, // Dummy distance (replace with actual)
-        totalTime: coordinates.length * 10, // Dummy time (replace with actual)
+  testRoute: L.Routing.IRoute = {
+    name: "Test Route",
+    coordinates: [
+      L.latLng(8.501678, 124.632554),
+      L.latLng(8.484751, 124.63411),
+    ],
+    summary: {
+      totalDistance: 2000, // Total distance in meters
+      totalTime: 1200, // Total time in seconds
+    },
+    instructions: [
+      {
+        text: "Start at point 1",
+        distance: 1000, // Distance for this instruction in meters
+        time: 600, // Time for this instruction in seconds
       },
-      instructions: [
-        {
-          text: `Take ${route.startRoute.name}`,
-          distance: 0, // Replace with actual distance if available
-          time: 0, // Replace with actual time if available
-        },
-        {
-          text: `Take ${route.endRoute.name}`,
-          distance: 0,
-          time: 0,
-        },
-      ],
-    };
-  }
+      {
+        text: "Continue to point 2",
+        distance: 1000,
+        time: 600,
+      },
+    ],
+  };
 }
+
+
 
 const JeepneyRouter = ({
   start,
