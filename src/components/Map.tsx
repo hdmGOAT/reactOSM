@@ -23,12 +23,10 @@ const Map = () => {
       .then((data) => {
         console.log("Fetched routes:", data);
 
-        // Ensure the data is in the expected format
         if (!data.jeepneyRoutes || !Array.isArray(data.jeepneyRoutes)) {
           throw new Error("Invalid data format");
         }
 
-        // Log each route for inspection
         data.jeepneyRoutes.forEach((route: JeepneyRoute) =>
           console.log(`Route Name: ${route.name}, Color: ${route.color}`)
         );
@@ -48,8 +46,8 @@ const Map = () => {
 
   console.log("yo:", jeepneyRoutes);
 
-  const start: [number, number] = [8.501678, 124.632554];
-  const end: [number, number] = [8.484751, 124.63411];
+  const start: [number, number] = [8.485196, 124.657056];
+  const end: [number, number] = [8.48604, 124.650837];
 
   if (jeepneyRoutes.length === 0) {
     return <p>Loading routes...</p>;

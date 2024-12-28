@@ -45,17 +45,10 @@ class FlexibleJeepneyRouter {
         end
       );
       if (directRoute) {
+        const formattedRoute = this.formatDirectRoute(directRoute);
+
         console.log("Direct route found:", directRoute);
-        callback(undefined, [this.formatRoute(directRoute)]);
-        return;
-      }
-
-      const transferRoute = this.findTransferRoute(startRoutes, endRoutes);
-      console.log("Transfer route before formatting:", transferRoute);
-
-      if (transferRoute) {
-        console.log("Transfer route found:", transferRoute);
-        //callback(undefined, [this.formatRoute(transferRoute)]);
+        callback(undefined, [formattedRoute]);
         return;
       }
 
@@ -117,28 +110,30 @@ class FlexibleJeepneyRouter {
     }
     return null;
   }
+   
 
-  findTransferRoute(startRoutes: any, endRoutes: any) {
-    for (let startRoute of startRoutes) {
-      for (let endRoute of endRoutes) {
-        const transferStops = this.findOverlapPoints(startRoute, endRoute);
-        if (transferStops.length > 0) {
-          return { startRoute, endRoute, transferStop: transferStops[0] };
-        }
-      }
-    }
-    return null;
-  }
+  formatDirectRoute(route: any): L.Routing.IRoute {
+    console.log("Formatting direct route:", route);
 
-  findOverlapPoints(routeA: any, routeB: any) {
-    return routeA.coordinates.filter((coordA: [number, number]) =>
-      routeB.coordinates.some((coordB: [number, number]) => {
-        return (
-          Math.abs(coordA[0] - coordB[0]) < 0.0005 &&
-          Math.abs(coordA[1] - coordB[1]) < 0.0005
-        );
-      })
+    const coordinates = route.route.coordinates.map(
+      ([lat, lng]: [number, number]) => L.latLng(lat, lng)
     );
+
+    return {
+      name: route.route.name || "Direct Route",
+      coordinates,
+      summary: {
+        totalDistance: coordinates.length * 100, // Dummy distance
+        totalTime: coordinates.length * 10, // Dummy time
+      },
+      instructions: [
+        {
+          text: `Follow the ${route.route.name}`,
+          distance: 0, // Replace with actual distance
+          time: 0, // Replace with actual time
+        },
+      ],
+    };
   }
 
   formatRoute(route: any): L.Routing.IRoute {
@@ -146,13 +141,12 @@ class FlexibleJeepneyRouter {
 
     const coordinates = [
       ...route.startRoute.coordinates,
-      ...[route.transferStop],
+
       ...route.endRoute.coordinates,
     ].map(([lat, lng]: [number, number]) => L.latLng(lat, lng)); // Convert to Leaflet LatLng
 
     return {
-      name: `${route.startRoute.name} to ${route.endRoute.name}`, // Generate a dynamic name
-      coordinates,
+      name: `${route.startRoute.name} to ${route.endRoute.name}`,
       summary: {
         totalDistance: coordinates.length * 100, // Dummy distance (replace with actual)
         totalTime: coordinates.length * 10, // Dummy time (replace with actual)
@@ -162,11 +156,6 @@ class FlexibleJeepneyRouter {
           text: `Take ${route.startRoute.name}`,
           distance: 0, // Replace with actual distance if available
           time: 0, // Replace with actual time if available
-        },
-        {
-          text: `Transfer at (${route.transferStop[0]}, ${route.transferStop[1]})`,
-          distance: 0,
-          time: 0,
         },
         {
           text: `Take ${route.endRoute.name}`,
@@ -210,8 +199,13 @@ const JeepneyRouter = ({
     }
 
     return () => {
-      if (map) {
-        map.removeControl(routingControl);
+      if (map && routingControl) {
+        try {
+          map.removeControl(routingControl);
+          console.log("Routing control removed from map.");
+        } catch (error) {
+          console.error("Error removing routing control:", error);
+        }
       }
     };
   }, [map, start, end, routes]);
