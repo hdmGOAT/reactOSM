@@ -55,7 +55,7 @@ class FlexibleJeepneyRouter {
 
       if (transferRoute) {
         console.log("Transfer route found:", transferRoute);
-        callback(undefined, [this.formatRoute(transferRoute)]);
+        //callback(undefined, [this.formatRoute(transferRoute)]);
         return;
       }
 
@@ -69,7 +69,7 @@ class FlexibleJeepneyRouter {
     }
   }
 
-  findRoutesNearPoint(point: L.LatLng, threshold = 8000) {
+  findRoutesNearPoint(point: L.LatLng, threshold = 0.5) {
     console.log("Checking point:", point);
 
     return this.routes.filter((route) => {
@@ -78,7 +78,8 @@ class FlexibleJeepneyRouter {
       const line = turf.lineString(route.coordinates);
       const nearestPoint = nearestPointOnLine(
         line,
-        turf.point([point.lng, point.lat])
+        turf.point([point.lat, point.lng]),
+        { units: "kilometers" }
       );
 
       if (nearestPoint.properties && nearestPoint.properties.dist) {
@@ -143,10 +144,9 @@ class FlexibleJeepneyRouter {
   formatRoute(route: any): L.Routing.IRoute {
     console.log("Formatting route:", route);
 
-    // Combine startRoute, transferStop, and endRoute into a single coordinates array
     const coordinates = [
       ...route.startRoute.coordinates,
-      ...[route.transferStop], // Ensure transferStop is added as an array
+      ...[route.transferStop],
       ...route.endRoute.coordinates,
     ].map(([lat, lng]: [number, number]) => L.latLng(lat, lng)); // Convert to Leaflet LatLng
 
@@ -178,9 +178,6 @@ class FlexibleJeepneyRouter {
   }
 }
 
-
-
-
 const JeepneyRouter = ({
   start,
   end,
@@ -200,7 +197,7 @@ const JeepneyRouter = ({
 
     const routingControl = L.Routing.control({
       waypoints: [L.latLng(start[0], start[1]), L.latLng(end[0], end[1])],
-      //router: new FlexibleJeepneyRouter(routes),
+      router: new FlexibleJeepneyRouter(routes),
       routeWhileDragging: true,
     });
 
