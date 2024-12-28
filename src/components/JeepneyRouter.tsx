@@ -17,6 +17,10 @@ class FlexibleJeepneyRouter {
 
   constructor(routes: JeepneyRoute[]) {
     this.routes = routes;
+    this.route = this.route.bind(this); // Ensure 'route' is bound correctly
+    this.findRoutesNearPoint = this.findRoutesNearPoint.bind(this); // Binding other methods as well
+    this.findDirectRoute = this.findDirectRoute.bind(this);
+    this.formatDirectRoute = this.formatDirectRoute.bind(this);
   }
 
   route(
@@ -27,61 +31,10 @@ class FlexibleJeepneyRouter {
     ) => void
   ) {
     try {
-      console.log("Waypoints passed to router:", waypoints);
-
-      const start = waypoints[0].latLng;
-      const end = waypoints[1].latLng;
-
-      console.log("Start:", start, "End:", end);
-
-      const startRoutes = this.findRoutesNearPoint(start);
-      const endRoutes = this.findRoutesNearPoint(end);
-
-      console.log("Start routes:", startRoutes);
-      console.log("End routes:", endRoutes);
-
-      const directRoute = this.findDirectRoute(
-        startRoutes,
-        endRoutes,
-        start,
-        end
-      );
-      if (directRoute) {
-        const formattedRoute = this.formatDirectRoute(directRoute);
-
-        console.log("Direct route found:", directRoute);
-        console.log("Formatted direct route:", formattedRoute);
-        try {
-          console.log("Invoking callback with formatted route...");
-          try {
-            console.log("Invoking callback with test route...");
-            if (
-              !this.testRoute.coordinates ||
-              this.testRoute.coordinates.length === 0
-            ) {
-              throw new Error("Test route has invalid or missing coordinates.");
-            }
-
-            callback(undefined, [this.testRoute]);
-            console.log("Callback invoked successfully with test route.");
-          } catch (callbackError) {
-            console.error(
-              "Error invoking callback with test route:",
-              callbackError
-            );
-            throw callbackError;
-          }
-
-          console.log("Callback invoked successfully.");
-        } catch (callbackError) {
-          console.error("Error invoking callback:", callbackError);
-          throw callbackError;
-        }
-
-        return;
+      if (!this.testRoute || !this.testRoute.coordinates){
+        throw new Error("Invalid Test Route Structure")
       }
-
-      callback({ status: 404, message: "No route found" }, undefined);
+      callback(undefined, [this.testRoute])
     } catch (error) {
       console.error("Error in FlexibleJeepneyRouter.route:", error);
       callback(
@@ -233,9 +186,11 @@ const JeepneyRouter = ({
       return;
     }
 
+    const jeepneyRouter = new FlexibleJeepneyRouter(routes);
+
     const routingControl = L.Routing.control({
       waypoints: [L.latLng(start[0], start[1]), L.latLng(end[0], end[1])],
-      router: new FlexibleJeepneyRouter(routes),
+      router: jeepneyRouter,
       routeWhileDragging: true,
     });
 
