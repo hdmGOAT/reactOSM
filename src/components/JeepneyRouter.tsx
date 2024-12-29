@@ -1,4 +1,4 @@
-import L from "leaflet";
+import L, { bind } from "leaflet";
 import * as turf from "@turf/turf";
 import nearestPointOnLine from "@turf/nearest-point-on-line";
 import { useMap } from "react-leaflet";
@@ -17,154 +17,45 @@ class FlexibleJeepneyRouter {
 
   constructor(routes: JeepneyRoute[]) {
     this.routes = routes;
-    this.route = this.route.bind(this); // Ensure 'route' is bound correctly
-    this.findRoutesNearPoint = this.findRoutesNearPoint.bind(this); // Binding other methods as well
-    this.findDirectRoute = this.findDirectRoute.bind(this);
-    this.formatDirectRoute = this.formatDirectRoute.bind(this);
   }
 
-  route(
+  route = (
     waypoints: L.Routing.Waypoint[],
-    callback: (
-      error?: L.Routing.IError | undefined,
-      routes?: L.Routing.IRoute[] | undefined
-    ) => void
-  ) {
-    try {
-      if (!this.testRoute || !this.testRoute.coordinates){
-        throw new Error("Invalid Test Route Structure")
-      }
-      callback(undefined, [this.testRoute])
-    } catch (error) {
-      console.error("Error in FlexibleJeepneyRouter.route:", error);
-      callback(
-        { status: 500, message: "Internal error in routing" },
-        undefined
-      );
-    }
+    callback: (error?: L.Routing.IError, routes?: L.Routing.IRoute[]) => void
+  ) => {
+    // Calculate the route based on the waypoints and available routes
+    const route = this.getRouteFromWaypoints(waypoints);
+    callback(undefined, [route]);
   }
 
-  findRoutesNearPoint(point: L.LatLng, threshold = 0.5) {
-    console.log("Checking point:", point);
-
-    return this.routes.filter((route) => {
-      console.log("Route being checked:", route);
-
-      const line = turf.lineString(route.coordinates);
-      const nearestPoint = nearestPointOnLine(
-        line,
-        turf.point([point.lat, point.lng]),
-        { units: "kilometers" }
-      );
-
-      if (nearestPoint.properties && nearestPoint.properties.dist) {
-        console.log("Distance to nearest point:", nearestPoint.properties.dist);
-        return nearestPoint.properties.dist <= threshold;
-      } else {
-        console.warn("Nearest point has no distance property");
-        return false;
-      }
-    });
-  }
-
-  findDirectRoute(
-    startRoutes: any,
-    endRoutes: any,
-    start: L.LatLng,
-    end: L.LatLng
-  ) {
-    for (let route of startRoutes) {
-      console.log("route:", route);
-      if (endRoutes.includes(route)) {
-        const line = turf.lineString(route.coordinates);
-        const startNearest = nearestPointOnLine(
-          line,
-          turf.point([start.lat, start.lng])
-        );
-        const endNearest = nearestPointOnLine(
-          line,
-          turf.point([end.lat, end.lng])
-        );
-
-        console.log("startNearest: ", startNearest, "endNearest: ", endNearest);
-
-        console.log(
-          "aaaaaaa",
-          startNearest.properties.index,
-          "bbbbb",
-          endNearest.properties.index
-        );
-
-        return { route, startNearest, endNearest };
-      }
-    }
-    return null;
-  }
-
-  formatDirectRoute(route: any): L.Routing.IRoute {
-    console.log("Formatting direct route:", route);
-
-    // Validate and map coordinates
-    const coordinates = route.route.coordinates.map(
-      ([lat, lng]: [number, number]) => {
-        if (typeof lat !== "number" || typeof lng !== "number") {
-          throw new Error("Invalid coordinate format in route.coordinates");
-        }
-        return L.latLng(lat, lng);
-      }
-    );
-
-    if (coordinates.length === 0) {
-      throw new Error("Route has no valid coordinates.");
-    }
-
-    // Create a LineString and calculate total distance and time
-    const line = lineString(route.route.coordinates);
-    const totalDistance = length(line, { units: "kilometers" }) * 1000; // Convert to meters
-    const totalTime = (totalDistance / 50) * 60; // Assume 50 km/h average speed
-
-    // Generate detailed instructions
-    const instructions = coordinates.map((_: any, index: number) => ({
-      text: `Continue to point ${index + 1}`,
-      distance: totalDistance / coordinates.length,
-      time: totalTime / coordinates.length,
-    }));
-
-    // Return the formatted route
+  // You need to implement a method that calculates a route based on the waypoints
+  getRouteFromWaypoints(waypoints: L.Routing.Waypoint[]): L.Routing.IRoute {
+    // You would use your existing logic to calculate the best route here.
+    // For now, we're returning a predefined route:
     return {
-      name: route.route.name || "Direct Route",
-      coordinates,
+      name: "Test Route",
+      coordinates: [
+        L.latLng(8.501678, 124.632554),
+        L.latLng(8.484751, 124.63411),
+      ],
       summary: {
-        totalDistance,
-        totalTime,
+        totalDistance: 2000,
+        totalTime: 1200,
       },
-      instructions,
+      instructions: [
+        {
+          text: "Start at point 1",
+          distance: 1000,
+          time: 600,
+        },
+        {
+          text: "Continue to point 2",
+          distance: 1000,
+          time: 600,
+        },
+      ],
     };
   }
-
-  testRoute: L.Routing.IRoute = {
-    name: "Test Route",
-    coordinates: [
-      L.latLng(8.501678, 124.632554),
-      L.latLng(8.484751, 124.63411),
-    ],
-    summary: {
-      totalDistance: 2000, // Total distance in meters
-      totalTime: 1200, // Total time in seconds
-    },
-    instructions: [
-      {
-        text: "Start at point 1",
-        distance: 1000, // Distance for this instruction in meters
-        time: 600, // Time for this instruction in seconds
-      },
-      {
-        text: "Continue to point 2",
-        distance: 1000,
-        time: 600,
-      },
-    ],
-  };
 }
 
 
@@ -195,7 +86,7 @@ const JeepneyRouter = ({
     });
 
     console.log("Routing control initialized:", routingControl);
-
+    jeepneyRouter.route = jeepneyRouter.route.bind(jeepneyRouter);
     try {
       routingControl.addTo(map);
     } catch (error) {
