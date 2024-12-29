@@ -12,53 +12,28 @@ export type JeepneyRoute = {
   coordinates: [number, number][];
 };
 
+
 class FlexibleJeepneyRouter {
-  routes: JeepneyRoute[];
+  route(
+    waypoints: L.Routing.Waypoint[], 
+    callback: (L.Routing.IError | null,
+     routes?: L.Routing.IRoute[]) => void, context?: any, options?) {
 
-  constructor(routes: JeepneyRoute[]) {
-    this.routes = routes;
-  }
-
-  route = (
-    waypoints: L.Routing.Waypoint[],
-    callback: (error?: L.Routing.IError, routes?: L.Routing.IRoute[]) => void
-  ) => {
-    // Calculate the route based on the waypoints and available routes
-    const route = this.getRouteFromWaypoints(waypoints);
-    callback(undefined, [route]);
-  }
-
-  // You need to implement a method that calculates a route based on the waypoints
-  getRouteFromWaypoints(waypoints: L.Routing.Waypoint[]): L.Routing.IRoute {
-    // You would use your existing logic to calculate the best route here.
-    // For now, we're returning a predefined route:
-    return {
-      name: "Test Route",
-      coordinates: [
-        L.latLng(8.501678, 124.632554),
-        L.latLng(8.484751, 124.63411),
-      ],
+    const coordinates = waypoints.map((wp) => wp.latLng);
+    const route = {
+      name: "Custom Route",
+      coordinates: coordinates,
+      instructions: [], // Add instructions if needed
       summary: {
-        totalDistance: 2000,
-        totalTime: 1200,
+        totalDistance: 1000, // Example distance in meters
+        totalTime: 600, // Example time in seconds
       },
-      instructions: [
-        {
-          text: "Start at point 1",
-          distance: 1000,
-          time: 600,
-        },
-        {
-          text: "Continue to point 2",
-          distance: 1000,
-          time: 600,
-        },
-      ],
     };
+
+    // Invoke the callback with the route
+    callback.call(context, null, [route]);
   }
 }
-
-
 
 const JeepneyRouter = ({
   start,
@@ -77,16 +52,16 @@ const JeepneyRouter = ({
       return;
     }
 
-    const jeepneyRouter = new FlexibleJeepneyRouter(routes);
-
     const routingControl = L.Routing.control({
       waypoints: [L.latLng(start[0], start[1]), L.latLng(end[0], end[1])],
-      router: jeepneyRouter,
       routeWhileDragging: true,
+      router: new FlexibleJeepneyRouter(routes, [
+        L.Routing.waypoint(L.latLng(start[0], start[1])),
+        L.Routing.waypoint(L.latLng(end[0], end[1])),
+      ]),
     });
 
     console.log("Routing control initialized:", routingControl);
-    jeepneyRouter.route = jeepneyRouter.route.bind(jeepneyRouter);
     try {
       routingControl.addTo(map);
     } catch (error) {
