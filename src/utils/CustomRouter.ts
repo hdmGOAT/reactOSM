@@ -24,7 +24,20 @@ export class CustomRouter extends L.Class {
             "distance"
         }
         ],
-        
+        "waypoints": [
+            {
+                "hint"
+                "distance"
+                "name"
+                "location"
+            },
+            {
+                "hint"
+                "distance"
+                "name"
+                "location"
+            },
+        ]
         
         
         }
