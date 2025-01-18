@@ -3,9 +3,8 @@ import "leaflet/dist/leaflet.css";
 import "leaflet-routing-machine";
 import "leaflet-routing-machine/dist/leaflet-routing-machine.css";
 import "leaflet-routing-machine/dist/leaflet-routing-machine.js";
-import JeepneyRouter from "./JeepneyRouter";
-import { JeepneyRoute } from "./JeepneyRouter";
 import { useEffect, useState } from "react";
+import { JeepneyRoute } from "../types/jeepneyRoute";
 
 const Map = () => {
   const defaultCenter: [number, number] = [8.47543, 124.64212];
@@ -79,9 +78,6 @@ const Map = () => {
           <Marker position={end} />
         </LayersControl.Overlay>
 
-        <LayersControl.Overlay name="Jeepney Route">
-          <JeepneyRouter start={start} end={end} routes={jeepneyRoutes} />
-        </LayersControl.Overlay>
       </LayersControl>
     </MapContainer>
   );
