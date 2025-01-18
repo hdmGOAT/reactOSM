@@ -4,7 +4,9 @@ import "leaflet-routing-machine";
 import "leaflet-routing-machine/dist/leaflet-routing-machine.css";
 import "leaflet-routing-machine/dist/leaflet-routing-machine.js";
 import { useEffect, useState } from "react";
-import { JeepneyRoute } from "../types/jeepneyRoute";
+import { JeepneyRoute } from "../types/JeepneyRoute";
+import Routing from "../utils/Routing";
+import { LatLng } from "leaflet";
 
 const Map = () => {
   const defaultCenter: [number, number] = [8.47543, 124.64212];
@@ -45,8 +47,8 @@ const Map = () => {
 
   console.log("yo:", jeepneyRoutes);
 
-  const start: [number, number] = [8.485196, 124.657056];
-  const end: [number, number] = [8.48604, 124.650837];
+  const start: LatLng = new LatLng(8.485196, 124.657056);
+  const end: LatLng = new LatLng(8.48604, 124.650837);
 
   if (jeepneyRoutes.length === 0) {
     return <p>Loading routes...</p>;
@@ -78,6 +80,9 @@ const Map = () => {
           <Marker position={end} />
         </LayersControl.Overlay>
 
+        <LayersControl.Overlay name="Routing" checked>
+          <Routing start={start} end={end} />
+        </LayersControl.Overlay>
       </LayersControl>
     </MapContainer>
   );
