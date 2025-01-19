@@ -8,7 +8,7 @@ def route(request):
                     "routes": [
                       {
                         "geometry": 123,
-                        "legs": [
+                        "legs": [{
                           "steps": [
                             "turn to left"
                           ],
@@ -16,6 +16,7 @@ def route(request):
                           "weight": 12,
                           "duration": 12,
                           "distance": 12,
+                        }
                         ],
                         "weight_name": "price",
                         "weight": 12,
