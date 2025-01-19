@@ -1,13 +1,41 @@
 from django.shortcuts import render
-from django.http import HttpResponse
+from django.http import JsonResponse
 # Create your views here.
 
 def route(request):
-  html_content = """
-    <html>
-        <body>
-            <h1>Hello, World!</h1>
-        </body>
-    </html>
-    """
-  return HttpResponse(html_content)
+  test_response = {
+                    "code": 1, 
+                    "routes": [
+                      {
+                        "geometry": 123,
+                        "legs": [
+                          "steps": [
+                            "turn to left"
+                          ],
+                          "summary": "",
+                          "weight": 12,
+                          "duration": 12,
+                          "distance": 12,
+                        ],
+                        "weight_name": "price",
+                        "weight": 12,
+                        "duration":12,
+                        "distance": 12,
+                      }
+                    ],
+                    "waypoints": [
+                      {
+                        "hint": "yo",
+                        "distance": 12,
+                        "name": "asdfa",
+                        "location": [12, 12],
+                      },
+                      {
+                        "hint": "yo",
+                        "distance": 12,
+                        "name": "asdfa",
+                        "location": [12, 12],
+                      },
+                    ]
+                  }
+  return JsonResponse(test_response)
