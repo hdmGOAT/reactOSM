@@ -12,7 +12,7 @@ def route(request):
                           "steps": [
                             "turn to left"
                           ],
-                          "summary": "",
+                          "summary": "aaaaaaaa",
                           "weight": 12,
                           "duration": 12,
                           "distance": 12,
